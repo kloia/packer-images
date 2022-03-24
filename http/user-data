@@ -1,0 +1,138 @@
+#cloud-config
+autoinstall:
+  version: 1
+  locale: en_US
+  keyboard:
+    layout: en
+    variant: us
+  network:
+    version: 2
+    renderer: networkd
+    ethernets:
+      ens192:
+        dhcp4: true
+        addresses:
+          - 172.28.120.41/24
+        gateway4: 172.28.120.1
+        nameservers:
+            addresses: [172.28.1.21,172.28.1.22]
+  storage:
+    #### Don't create /root/swap.img file
+    swap:
+      size: 0
+    config:
+    #### prep system disks
+    - type: disk
+      id: disk-sda
+      path: /dev/sda
+      preserve: false
+      wipe: superblock-recursive
+      ptable: gpt
+      grub_device: true
+     #### disk partitions
+    - type: partition
+      number: 1
+      id: bios_boot_part   # required by GRUB on first disk
+      size: 1MB
+      device: disk-sda
+      flag: bios_grub
+    - type: partition
+      number: 2
+      id: boot_part       # /boot partition
+      size: 1G
+      device: disk-sda
+      preserve: false
+    - type: partition
+      number: 3
+      id: lvm_part        # add remaining space to LVM
+      size: -1
+      device: disk-sda
+      preserve: false
+     #### LVM volume group and logical volumes
+    - type: lvm_volgroup
+      id: vg0
+      name: vg0
+      devices:
+        - lvm_part
+    # - type: lvm_partition
+    #   id: lvm_swap        # create swap partition on lvm
+    #   volgroup: vg0
+    #   name: swap
+    #   size: 8G
+    - type: lvm_partition
+      id: lvm_root        # create / partition on lvm, all available space
+      volgroup: vg0
+      name: root
+      size: -1
+    #### Format the filesystems
+    - type: format
+      id: fs_boot_part
+      fstype: ext4
+      volume: boot_part
+    - type: format
+      id: fs_root
+      fstype: ext4
+      volume: lvm_root
+    # - type: format
+    #   id: fs_swap
+    #   fstype: swap
+    #   volume: lvm_swap
+    #### Mount the filesystems
+    - type: mount
+      id: mount_boot
+      device: fs_boot_part
+      path: /boot
+    - type: mount
+      id: mount_root
+      device: fs_root
+      path: /
+
+    - type: disk
+      id: disk-sdb
+      path: /dev/sdb
+      preserve: false
+      wipe: superblock-recursive
+      ptable: gpt
+      grub_device: false
+     #### disk partitions
+    - type: partition
+      number: 4
+      id: lvm_part_data        # add remaining space to LVM
+      size: -1
+      device: disk-sdb
+      preserve: false
+     #### LVM volume group and logical volumes
+    - type: lvm_volgroup
+      id: vgdata
+      name: vgdata
+      devices:
+        - lvm_part_data
+    - type: lvm_partition
+      id: lvm_data        # create / partition on lvm, all available space
+      volgroup: vgdata
+      name: data
+      size: -1
+    #### Format the filesystems
+    - type: format
+      id: fs_data
+      fstype: ext4
+      volume: lvm_data
+    # - type: mount
+    #   id: mount_data
+    #   device: fs_data
+    #   path: /mnt
+  identity:
+    hostname: ubuntu
+    username: ubuntu
+    password: '$6$rounds=4096$NYG7e8HxIMgz1$BqP28Ppt0FqXiBQuiE6PxiVBJJJAbm8tJrNz4HC7MEC.7Gv/eOyQIfaLqZ6W6fnMMtxP.BYfHmTBxUFQQs0u91'
+  ssh:
+    allow-pw: true
+    authorized-keys: []
+    install-server: true
+  packages:
+    - open-vm-tools
+  user-data:
+    disable_root: false
+  late-commands:
+    - 'sed -i "s/dhcp4: true/&\n      dhcp-identifier: mac/" /target/etc/netplan/00-installer-config.yaml'
+    - echo 'ubuntu ALL=(ALL) NOPASSWD:ALL' > /target/etc/sudoers.d/ubuntu
