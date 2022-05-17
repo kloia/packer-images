@@ -1,9 +1,9 @@
 source "amazon-ebs" "amazon-k8s-environment" {
   access_key     = var.access_key
   secret_key     = var.secret_key
-  assume_role {
-        role_arn     = var.role_arn
-  }
+  #assume_role {
+  #      role_arn     = var.role_arn
+  #}
   region         = var.region
   vpc_id         = var.vpc_id
   subnet_id      = var.subnet_id
